@@ -1,0 +1,191 @@
+.app-shell {
+  width: min(1400px, 100% - 1.5rem);
+  margin: 1rem auto;
+  display: grid;
+  gap: 1rem;
+}
+
+.app-header {
+  background: linear-gradient(130deg, rgba(248, 233, 207, 0.88), rgba(235, 244, 240, 0.88));
+  border: 1px solid rgba(27, 53, 81, 0.18);
+  border-radius: 20px;
+  box-shadow: 0 10px 26px rgba(16, 38, 54, 0.12);
+  padding: 1.2rem 1.2rem 1.1rem;
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: clamp(1.7rem, 3.6vw, 2.5rem);
+  line-height: 1.1;
+}
+
+.app-header p {
+  margin: 0.65rem 0 0.95rem;
+  max-width: 72ch;
+}
+
+.status-line {
+  margin: 0.3rem 0 0.8rem;
+  font-size: 0.9rem;
+  color: #24506b;
+}
+
+.status-error {
+  color: #7d2d1c;
+}
+
+.app-header label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.7rem;
+  font-weight: 600;
+  color: #173754;
+  margin-top: 0.55rem;
+}
+
+.app-header select {
+  font: inherit;
+  border: 1px solid rgba(20, 56, 80, 0.28);
+  border-radius: 10px;
+  padding: 0.45rem 0.75rem;
+  background: #fbf8f1;
+  color: #112839;
+}
+
+.graph-panel {
+  position: relative;
+  inline-size: 100%;
+  block-size: clamp(680px, 78vh, 1080px);
+  min-inline-size: 360px;
+  min-block-size: 420px;
+  max-inline-size: 100%;
+  max-block-size: 1200px;
+  resize: vertical;
+  border-radius: 20px;
+  overflow: hidden;
+  border: 1px solid rgba(25, 58, 90, 0.18);
+  background:
+    radial-gradient(circle at 14% 18%, rgba(237, 108, 87, 0.13), transparent 42%),
+    radial-gradient(circle at 82% 70%, rgba(31, 111, 139, 0.16), transparent 39%),
+    linear-gradient(145deg, #f8f4ea, #eef7f4);
+  box-shadow: 0 14px 30px rgba(8, 28, 42, 0.14);
+}
+
+.graph-panel svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.empty-state {
+  position: absolute;
+  inset: 1rem;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  color: #2c4a60;
+  font-weight: 600;
+}
+
+.link-line {
+  stroke: rgba(48, 79, 104, 0.44);
+  pointer-events: visibleStroke;
+}
+
+.link-label {
+  fill: #23425a;
+  font-size: 0.7rem;
+  text-anchor: middle;
+  dominant-baseline: middle;
+  paint-order: stroke;
+  stroke: rgba(255, 250, 241, 0.96);
+  stroke-width: 3.2px;
+  font-weight: 550;
+  pointer-events: all;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.node-circle {
+  stroke: rgba(245, 251, 255, 0.92);
+  stroke-width: 1.7px;
+  cursor: grab;
+}
+
+.node-circle:active {
+  cursor: grabbing;
+}
+
+.node-label {
+  font-size: 0.95rem;
+  text-anchor: middle;
+  fill: #fdfdfd;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.tooltip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  max-width: min(360px, calc(100% - 1rem));
+  background: rgba(13, 32, 46, 0.94);
+  color: #f6f4ef;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  padding: 0.7rem 0.75rem;
+  box-shadow: 0 12px 20px rgba(0, 0, 0, 0.28);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 120ms ease-in-out;
+  font-size: 0.88rem;
+  line-height: 1.35;
+}
+
+.tooltip h3 {
+  margin: 0 0 0.3rem;
+  font-size: 0.95rem;
+}
+
+.tooltip p {
+  margin: 0.15rem 0;
+}
+
+.tooltip ul {
+  margin: 0.4rem 0 0;
+  padding-left: 1rem;
+}
+
+.tooltip li {
+  margin: 0.2rem 0;
+}
+
+@media (max-width: 740px) {
+  .app-shell {
+    width: calc(100% - 1rem);
+    margin: 0.5rem auto;
+  }
+
+  .app-header {
+    padding: 0.95rem;
+  }
+
+  .app-header label {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .graph-panel {
+    resize: none;
+    min-inline-size: 0;
+    block-size: clamp(460px, 68vh, 760px);
+  }
+
+  .tooltip {
+    max-width: calc(100% - 1rem);
+    font-size: 0.82rem;
+  }
+}

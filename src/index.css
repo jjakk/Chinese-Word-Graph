@@ -1,0 +1,40 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Fraunces:opsz,wght@9..144,400;9..144,700&display=swap');
+
+:root {
+  font-family: 'Noto Sans SC', 'PingFang SC', 'Hiragino Sans GB', sans-serif;
+  line-height: 1.45;
+  font-weight: 400;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color: #11324a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    linear-gradient(124deg, rgba(255, 244, 222, 0.76), rgba(227, 244, 250, 0.72)),
+    repeating-linear-gradient(
+      45deg,
+      rgba(22, 55, 82, 0.02) 0,
+      rgba(22, 55, 82, 0.02) 14px,
+      rgba(248, 108, 88, 0.03) 14px,
+      rgba(248, 108, 88, 0.03) 28px
+    );
+}
+
+#root {
+  min-height: 100vh;
+}
+
+h1,
+h2,
+h3 {
+  font-family: 'Fraunces', 'Times New Roman', serif;
+}
