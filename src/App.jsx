@@ -4,14 +4,26 @@ import './App.css'
 
 const HSK_LEVEL_FILES = {
   1: [
-    '/dictionary/hsk1/hsk1-p1.json',
-    '/dictionary/hsk1/hsk1-p2.json',
-    '/dictionary/hsk1/hsk1-p3.json',
+    'dictionary/hsk1/hsk1-p1.json',
+    'dictionary/hsk1/hsk1-p2.json',
+    'dictionary/hsk1/hsk1-p3.json',
   ],
   2: [
-    '/dictionary/hsk2/hsk2-p1.json',
-    '/dictionary/hsk2/hsk2-p2.json',
-    '/dictionary/hsk2/hsk2-p3.json',
+    'dictionary/hsk2/hsk2-p1.json',
+    'dictionary/hsk2/hsk2-p2.json',
+    'dictionary/hsk2/hsk2-p3.json',
+  ],
+  3: [
+    'dictionary/hsk3/hsk3-p1.json',
+    'dictionary/hsk3/hsk3-p2.json',
+    'dictionary/hsk3/hsk3-p3.json',
+  ],
+  4: [
+    'dictionary/hsk4/hsk4-p1.json',
+    'dictionary/hsk4/hsk4-p2.json',
+    'dictionary/hsk4/hsk4-p3.json',
+    'dictionary/hsk4/hsk4-p4.json',
+    'dictionary/hsk4/hsk4-p5.json',
   ],
 }
 
@@ -270,15 +282,91 @@ function createClusterSeparationForce(minSpacing = 120, strength = 0.12) {
   return force
 }
 
+function createNodeToLinkRepulsionForce(minDistance = 20, strength = 0.12) {
+  let nodeList = []
+  let linkList = []
+
+  function force(alpha) {
+    if (nodeList.length === 0 || linkList.length === 0) {
+      return
+    }
+
+    nodeList.forEach((node) => {
+      linkList.forEach((link) => {
+        const source = link.source
+        const target = link.target
+
+        if (!source || !target || source.id == null || target.id == null) {
+          return
+        }
+
+        if (node.id === source.id || node.id === target.id) {
+          return
+        }
+
+        const x1 = source.x
+        const y1 = source.y
+        const x2 = target.x
+        const y2 = target.y
+        if (
+          x1 == null ||
+          y1 == null ||
+          x2 == null ||
+          y2 == null
+        ) {
+          return
+        }
+
+        const dx = x2 - x1
+        const dy = y2 - y1
+        const lenSq = dx * dx + dy * dy
+        if (lenSq === 0) {
+          return
+        }
+
+        let t = ((node.x - x1) * dx + (node.y - y1) * dy) / lenSq
+        t = clamp(t, 0, 1)
+        const closestX = x1 + t * dx
+        const closestY = y1 + t * dy
+        const offsetX = node.x - closestX
+        const offsetY = node.y - closestY
+        const distance = Math.hypot(offsetX, offsetY) || 0.001
+        const dynamicMinDistance = minDistance + node.radius * 0.45
+
+        if (distance >= dynamicMinDistance) {
+          return
+        }
+
+        const overlap = dynamicMinDistance - distance
+        const push = (overlap / distance) * strength * alpha
+        node.vx += offsetX * push
+        node.vy += offsetY * push
+      })
+    })
+  }
+
+  force.initialize = (newNodes, newLinks) => {
+    nodeList = newNodes || []
+    linkList = newLinks || []
+  }
+
+  return force
+}
+
 function App() {
   const [selectedLevel, setSelectedLevel] = useState(LEVEL_OPTIONS[0])
+  const [isCumulative, setIsCumulative] = useState(true)
   const [levelWordData, setLevelWordData] = useState({})
   const [loading, setLoading] = useState(true)
   const [loadErrors, setLoadErrors] = useState([])
   const graphRef = useRef(null)
+  const isolatedGraphRef = useRef(null)
   const containerRef = useRef(null)
+  const isolatedContainerRef = useRef(null)
   const tooltipRef = useRef(null)
+  const isolatedTooltipRef = useRef(null)
   const [size, setSize] = useState({ width: 1000, height: 680 })
+  const [isolatedSize, setIsolatedSize] = useState({ width: 1000, height: 680 })
 
   useEffect(() => {
     let isMounted = true
@@ -286,38 +374,43 @@ function App() {
     async function loadData() {
       setLoading(true)
 
+      const errors = []
+
       const entries = await Promise.all(
         LEVEL_OPTIONS.map(async (level) => {
           const files = HSK_LEVEL_FILES[level] || []
 
           const pageResults = await Promise.all(
             files.map(async (filePath) => {
-              const response = await fetch(filePath)
-              if (!response.ok) {
-                throw new Error(`Could not load ${filePath}`)
-              }
+              try {
+                const response = await fetch(`${import.meta.env.BASE_URL}${filePath}`)
+                if (!response.ok) {
+                  throw new Error(`Could not load ${filePath}`)
+                }
 
-              const page = await response.json()
-              return (page.words || []).map((wordEntry) => ({
-                ...wordEntry,
-                level,
-              }))
+                const page = await response.json()
+                return (page.words || []).map((wordEntry) => ({
+                  ...wordEntry,
+                  level,
+                }))
+              } catch (error) {
+                errors.push(error.message)
+                return []
+              }
             }),
           )
 
           return [level, pageResults.flat()]
         }),
       )
-        .then((loaded) => ({ loaded, errors: [] }))
-        .catch((error) => ({ loaded: [], errors: [error.message] }))
 
       if (!isMounted) {
         return
       }
 
-      const mapped = Object.fromEntries(entries.loaded)
+      const mapped = Object.fromEntries(entries)
       setLevelWordData(mapped)
-      setLoadErrors(entries.errors)
+      setLoadErrors(errors)
       setLoading(false)
     }
 
@@ -329,11 +422,33 @@ function App() {
   }, [])
 
   const words = useMemo(() => {
-    const levels = LEVEL_OPTIONS.filter((candidate) => candidate <= selectedLevel)
+    const levels =
+      isCumulative
+        ? LEVEL_OPTIONS.filter((candidate) => candidate <= selectedLevel)
+        : [selectedLevel]
+
     return levels.flatMap((level) => levelWordData[level] || [])
-  }, [levelWordData, selectedLevel])
+  }, [isCumulative, levelWordData, selectedLevel])
 
   const graph = useMemo(() => buildGraph(words), [words])
+  const linkedGraph = useMemo(() => {
+    const connectedNodeIds = new Set(
+      graph.links.flatMap((link) => [getNodeId(link.source), getNodeId(link.target)]),
+    )
+
+    return {
+      nodes: graph.nodes.filter((node) => connectedNodeIds.has(node.id)),
+      links: graph.links,
+    }
+  }, [graph])
+
+  const isolatedNodes = useMemo(() => {
+    const connectedNodeIds = new Set(
+      graph.links.flatMap((link) => [getNodeId(link.source), getNodeId(link.target)]),
+    )
+
+    return graph.nodes.filter((node) => !connectedNodeIds.has(node.id))
+  }, [graph])
 
   useEffect(() => {
     if (!containerRef.current) {
@@ -351,6 +466,21 @@ function App() {
   }, [])
 
   useEffect(() => {
+    if (!isolatedContainerRef.current) {
+      return undefined
+    }
+
+    const resizeObserver = new ResizeObserver(([entry]) => {
+      const width = clamp(Math.round(entry.contentRect.width), 360, 1600)
+      const height = clamp(Math.round(entry.contentRect.height), 420, 1200)
+      setIsolatedSize({ width, height })
+    })
+
+    resizeObserver.observe(isolatedContainerRef.current)
+    return () => resizeObserver.disconnect()
+  }, [])
+
+  useEffect(() => {
     const svgElement = graphRef.current
     const tooltipElement = tooltipRef.current
     if (!svgElement || !tooltipElement || !containerRef.current) {
@@ -358,7 +488,7 @@ function App() {
     }
 
     const { width, height } = size
-    const { nodes, links } = graph
+    const { nodes, links } = linkedGraph
     const graphPadding = 30
     const getScaledRadius = (node) => node.radius
     const maxConnectionScore = Math.max(
@@ -374,6 +504,10 @@ function App() {
     svg.selectAll('*').remove()
     svg.attr('viewBox', `0 0 ${width} ${height}`)
 
+    if (nodes.length === 0) {
+      return undefined
+    }
+
     svg
       .append('defs')
       .append('clipPath')
@@ -388,6 +522,15 @@ function App() {
       .append('g')
       .attr('class', 'chart-layer')
       .attr('clip-path', 'url(#graph-clip)')
+
+    const zoom = d3
+      .zoom()
+      .scaleExtent([0.5, 4])
+      .on('zoom', (event) => {
+        chart.attr('transform', event.transform)
+      })
+
+    svg.call(zoom).on('dblclick.zoom', null)
 
     const linkLines = chart
       .append('g')
@@ -573,6 +716,7 @@ function App() {
               connectionRatioForNode(d) * 6,
           ),
       )
+            .force('node-link-repulsion', createNodeToLinkRepulsionForce(22, 0.18))
       .force('cluster-separation', createClusterSeparationForce(86, 0.1))
 
     const drag = d3
@@ -623,48 +767,265 @@ function App() {
     return () => {
       simulation.stop()
     }
-  }, [graph, size])
+  }, [linkedGraph, size])
+
+  useEffect(() => {
+    const isolatedSvgElement = isolatedGraphRef.current
+    const tooltipElement = isolatedTooltipRef.current
+    if (!isolatedSvgElement || !tooltipElement || !isolatedContainerRef.current) {
+      return undefined
+    }
+
+    const { width, height } = isolatedSize
+    const svg = d3.select(isolatedSvgElement)
+    const tooltip = d3.select(tooltipElement)
+
+    svg.selectAll('*').remove()
+    svg.attr('viewBox', `0 0 ${width} ${height}`)
+
+    if (isolatedNodes.length === 0) {
+      return undefined
+    }
+
+    const chart = svg
+      .append('g')
+      .attr('class', 'isolated-chart-layer')
+
+    const zoom = d3
+      .zoom()
+      .scaleExtent([0.5, 4])
+      .on('zoom', (event) => {
+        chart.attr('transform', event.transform)
+      })
+
+    svg.call(zoom).on('dblclick.zoom', null)
+
+    const isolatedSimulationNodes = isolatedNodes.map((node) => ({
+      ...node,
+      x: width / 2 + (Math.random() - 0.5) * 36,
+      y: height / 2 + (Math.random() - 0.5) * 36,
+      displayRadius: clamp(node.radius, 12, 26),
+    }))
+
+    const nodeGroup = chart
+      .append('g')
+      .attr('class', 'isolated-nodes')
+      .selectAll('g')
+      .data(isolatedSimulationNodes)
+      .join('g')
+      .attr('transform', (node) => `translate(${node.x}, ${node.y})`)
+
+    nodeGroup
+      .append('circle')
+      .attr('class', 'node-circle isolated-circle')
+      .attr('r', (node) => node.displayRadius)
+      .attr('fill', (node) => (node.minLevel <= 2 ? '#1f6f8b' : '#ef6c57'))
+
+    nodeGroup
+      .append('text')
+      .attr('class', 'node-label')
+      .attr('font-size', (node) => `${clamp(node.displayRadius * 0.58, 10, 18)}px`)
+      .attr('dy', '0.35em')
+      .text((node) => node.char)
+
+    function showTooltip(html) {
+      tooltip
+        .style('opacity', 1)
+        .style('visibility', 'visible')
+        .html(html)
+    }
+
+    function moveTooltip(event) {
+      const container = isolatedContainerRef.current
+      if (!container) {
+        return
+      }
+
+      const [x, y] = d3.pointer(event, container)
+      const offset = 14
+      const edgePadding = 8
+      const tooltipWidth = tooltipElement.offsetWidth || 0
+      const tooltipHeight = tooltipElement.offsetHeight || 0
+      const maxLeft = container.clientWidth - tooltipWidth - edgePadding
+      const maxTop = container.clientHeight - tooltipHeight - edgePadding
+
+      const left = clamp(x + offset, edgePadding, Math.max(edgePadding, maxLeft))
+      const top = clamp(y + offset, edgePadding, Math.max(edgePadding, maxTop))
+
+      tooltip.style('left', `${left}px`).style('top', `${top}px`)
+    }
+
+    function hideTooltip() {
+      tooltip.style('opacity', 0).style('visibility', 'hidden')
+    }
+
+    nodeGroup
+      .on('mouseenter', (event, node) => {
+        const wordItems = node.words
+          .slice(0, 10)
+          .map(
+            (word) =>
+              `<li><b>${word.word}</b> (${word.pinyin}) - ${word.meaning}</li>`,
+          )
+          .join('')
+
+        showTooltip(
+          `<h3>字: ${node.char}</h3>
+            <p>Pinyin: ${node.charPinyins.join(' / ') || 'N/A'}</p>
+            <p>HSK: ${node.minLevel}</p>
+            <p>Words using this character: ${node.wordCount}</p>
+            <ul>${wordItems}</ul>`,
+        )
+        moveTooltip(event)
+      })
+      .on('mousemove', moveTooltip)
+      .on('mouseleave', hideTooltip)
+
+    const panelPadding = 28
+    const simulation = d3
+      .forceSimulation(isolatedSimulationNodes)
+      .force(
+        'charge',
+        d3
+          .forceManyBody()
+          .strength((node) => -45 - node.displayRadius * 6),
+      )
+      .force('center', d3.forceCenter(width / 2, height / 2))
+      .force('x', d3.forceX(width / 2).strength(0.17))
+      .force('y', d3.forceY(height / 2).strength(0.17))
+      .force(
+        'collision',
+        d3
+          .forceCollide()
+          .radius((node) => node.displayRadius + 4),
+      )
+
+    const drag = d3
+      .drag()
+      .on('start', (event, node) => {
+        if (!event.active) {
+          simulation.alphaTarget(0.3).restart()
+        }
+        node.fx = node.x
+        node.fy = node.y
+      })
+      .on('drag', (event, node) => {
+        node.fx = clamp(
+          event.x,
+          node.displayRadius + panelPadding,
+          width - node.displayRadius - panelPadding,
+        )
+        node.fy = clamp(
+          event.y,
+          node.displayRadius + panelPadding,
+          height - node.displayRadius - panelPadding,
+        )
+      })
+      .on('end', (event, node) => {
+        if (!event.active) {
+          simulation.alphaTarget(0)
+        }
+        node.fx = null
+        node.fy = null
+      })
+
+    nodeGroup.selectAll('.isolated-circle').call(drag)
+
+    simulation.on('tick', () => {
+      isolatedSimulationNodes.forEach((node) => {
+        node.x = clamp(
+          node.x,
+          node.displayRadius + panelPadding,
+          width - node.displayRadius - panelPadding,
+        )
+        node.y = clamp(
+          node.y,
+          node.displayRadius + panelPadding,
+          height - node.displayRadius - panelPadding,
+        )
+      })
+
+      nodeGroup.attr('transform', (node) => `translate(${node.x}, ${node.y})`)
+    })
+
+    return () => {
+      simulation.stop()
+      tooltip.style('opacity', 0).style('visibility', 'hidden')
+    }
+  }, [isolatedNodes, isolatedSize])
 
   return (
     <main className="app-shell">
       <header className="app-header">
         <h1>Mandarin Character Graph</h1>
         <p>
-          Select an HSK level to show all characters up to that level, and links
-          between characters that appear in the same word.
+          Select an HSK level and toggle cumulative mode to visualize linked
+          characters separately from standalone ones.
         </p>
         {loading && <p className="status-line">Loading dictionary data...</p>}
         {!loading && loadErrors.length > 0 && (
           <p className="status-line status-error">
-            Data file load error. Put dictionary files in /public/dictionary/...
+            Some dictionary files could not be loaded. Loaded what was available.
           </p>
         )}
-        <label htmlFor="hsk-level-select">
-          HSK Level
-          <select
-            id="hsk-level-select"
-            value={selectedLevel}
-            onChange={(event) => setSelectedLevel(Number(event.target.value))}
-            disabled={loading}
-          >
-            {LEVEL_OPTIONS.map((level) => (
-              <option key={level} value={level}>
-                HSK {level}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="header-controls">
+          <label htmlFor="hsk-level-select">
+            HSK Level
+            <select
+              id="hsk-level-select"
+              value={selectedLevel}
+              onChange={(event) => setSelectedLevel(Number(event.target.value))}
+              disabled={loading}
+            >
+              {LEVEL_OPTIONS.map((level) => (
+                <option key={level} value={level}>
+                  HSK {level}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <div className="toggle-control">
+            <span>Cumulative</span>
+            <button
+              type="button"
+              className={`toggle-button ${isCumulative ? 'active' : ''}`}
+              onClick={() => setIsCumulative((value) => !value)}
+              disabled={loading}
+              aria-pressed={isCumulative}
+            >
+              {isCumulative ? 'On (HSK 1 to selected)' : 'Off (Selected level only)'}
+            </button>
+          </div>
+        </div>
       </header>
 
-      <section className="graph-panel" ref={containerRef}>
-        <svg ref={graphRef} role="img" aria-label="Chinese character relationship graph" />
-        <div ref={tooltipRef} className="tooltip" />
-        {!loading && words.length === 0 && (
-          <div className="empty-state">
-            No words loaded. Add JSON files at /public/dictionary/hsk1 and /public/dictionary/hsk2.
-          </div>
-        )}
-      </section>
+      <div className="graph-views">
+        <section className="graph-panel" ref={containerRef}>
+          <h2>Linked Character Graph</h2>
+          <svg ref={graphRef} role="img" aria-label="Chinese character relationship graph" />
+          <div ref={tooltipRef} className="tooltip" />
+          {!loading && linkedGraph.nodes.length === 0 && words.length > 0 && (
+            <div className="empty-state">
+              No linked nodes for this selection. See standalone characters in the right panel.
+            </div>
+          )}
+          {!loading && words.length === 0 && (
+            <div className="empty-state">
+              No words loaded for this selection. Check dictionary files in /public/dictionary/hsk1 through /public/dictionary/hsk4.
+            </div>
+          )}
+        </section>
+
+        <section className="graph-panel isolated-panel" ref={isolatedContainerRef}>
+          <h2>Standalone Characters (No Links)</h2>
+          <svg ref={isolatedGraphRef} role="img" aria-label="Standalone Chinese characters graph" />
+          <div ref={isolatedTooltipRef} className="tooltip" />
+          {!loading && isolatedNodes.length === 0 && (
+            <div className="empty-state">No standalone characters in this selection.</div>
+          )}
+        </section>
+      </div>
     </main>
   )
 }
